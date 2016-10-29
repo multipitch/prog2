@@ -6,6 +6,11 @@ output file, along with some other parameters
 
 It was written for Python 3.* and has been tested on Python 3.5.2 and
 Python 2.7.12.
+
+Authors:  Chris Kiernan, Eoin O'Driscoll, Sean Tully
+Version:  2
+Date:     30th October 2016
+
 """
 from __future__ import (absolute_import, division, print_function, 
                         unicode_literals)
@@ -14,12 +19,17 @@ from __future__ import (absolute_import, division, print_function,
 import sys
 
 MAXITS = 1000
-MACHINE_EPSILON = sys.float_info.epsilon
-USER_EPSILON = 0.0
 OMEGA = 1.3
+MACHINE_EPSILON = sys.float_info.epsilon
+X_TOLERANCE = 0.0
+R_TOLERANCE = 0.0
+USER_EPSILON = 0.0
 
-def sparse_sor(A, b, n, maxits, user_epsilon, machine_epsilon,
-               omega, x=None):
+# TO DO:  Implement error / exception handling
+# TO DO:  Unit tests
+
+def sparse_sor(A, b, n, maxits, omega, machine_epsilon, x_tolerance=0.0,
+               r_tolerance=0.0, x=None):
     """Solves a system of linear equations of the form Ax = b.
         
     Args:
@@ -28,28 +38,39 @@ def sparse_sor(A, b, n, maxits, user_epsilon, machine_epsilon,
         b (list):  A vector of n floats.
         n (int):  Corresponds to the dimensions of A and b above.
         maxits (int):  The maximum number of iterations to attempt.
-        user_epsilon:  A user-specified error tolerance.
-        machine_epsilon:  Machine error tolerance for float operations.
         omega (float):  Relaxation parameter.
+        machine_epsilon:  Machine error tolerance for float operations.
+        x_tolerance (float):  User-specified tolerance in successive x
+            approximations (optional).
+        r_tolerance (float):  User-specified tolerance in successive
+            residual approximations (optional).
         x (list):  Initial guess for solution vector; a list of n floats
             (optional). If blank, x = [1, 1, ... , 1] is assumed.
     
     Returns:
         x (list):  Solution vector; a list of n floats.
         k (int):  The number of iterations taken.
+        stopReason (str):  Reason for halting the function
     """
+    k = 0
+    
+    # Check matrix diagonal valued for zeros.
+    for i in range(n):
+        for j in range(n):
+            if A[i][j] == 0:
+                return None, k, 'Zero on Diagonal'
+                 
     val, col, rowStart = make_sparse(A)  # Convert A to CSR format.
-    
-    # TO DO: Implement some tests on the inputs to make sure they are
-    #        suitable.
-    
+            
     if x is None:  # Construct initial x; elements must be non-zero.
         x = [1] * n
-        
-    k = 0
-    converged = False  # TO DO: Implement convergence test.
+
+    p = 2  # Parameter for p-norm calculation.
+    pInv = 1/float(p)
     
-    while not converged and k < maxits:
+    # Main iteration.
+    while k < maxits:
+        xOld = x[:]
         for i in range(n):
             spam = 0.0
             for j in range(rowStart[i], rowStart[i + 1]):
@@ -59,10 +80,24 @@ def sparse_sor(A, b, n, maxits, user_epsilon, machine_epsilon,
             x[i] += omega * (b[i] - spam)/d
         k += 1
         
-    # TO DO:  Return more information as per requirements of output
-    #         file.
-    
-    return x, k
+        # Calculate p-norms for x.
+        p = 2
+        xNorm = pNorm(x, 2)
+        deltax = []
+        for i in range(n):
+            deltax.append(x[i] - xOld[i])
+        deltaxNorm = pNorm(deltax, 2)
+        
+        # TO DO:  Implement residual calculation, halting test.
+        
+        # Perform halting tests.
+        if deltaxNorm <= x_tolerance + 4.0 * machine_epsilon * xNorm:
+            return x, k, 'x Sequence convergence'
+        if k > 1 and deltaxNorm > deltaxNormOld:
+            return None, k, 'x Sequence divergence'     
+        deltaxNormOld = deltaxNorm
+        
+    return x, k, 'Max Iterations reached'
 
 
 def make_sparse(A, m=None, n=None):
@@ -151,13 +186,14 @@ def read_problem(filename='nas_Sor.in', delimiter=' '):
     return A, b, n
 
 
-def write_solution(x, k, filename='nas_Sor.out', delimiter=' ', 
+def write_solution(x, k, stopReason, filename='nas_Sor.out', delimiter=' ', 
                   printToConsole=None):
     """Write solution to a file.
     
     Args:
         x (list):  Solution vector; a list of n floats.
         k (int):  The number of iterations taken.
+        stopReason (str):  Reason for halting the sparse_sor function.
         filename (str):  The filename (optional).
         delimiter (str):  The delimiter to use between the values of x
             (optional).
@@ -165,17 +201,14 @@ def write_solution(x, k, filename='nas_Sor.out', delimiter=' ',
             (optional).
     
     """
-    includeRST = True # TO DO: Test for this.
-    
-    # TO DO: Pass in other parameters and replace all the 'spam' strings
-    #        below with them.
     
     titles = ['Stopping reason','Max num of iterations','Number of iterations',
               'Machine epsilon','X seq tolerance']
-    params = ['spam', str(MAXITS), str(k), str(MACHINE_EPSILON), 'spam']
-    if includeRST:
+    params = [str(stopReason), str(MAXITS), str(k), str(MACHINE_EPSILON),
+              str(X_TOLERANCE)]
+    if R_TOLERANCE == None:
         titles.append('Residual seq tolerance')
-        params.append('spam')
+        params.append(str(R_TOLERANCE))
 
     # Pad titles and parameters with spaces to justify text.
     offset = 2
@@ -197,7 +230,32 @@ def write_solution(x, k, filename='nas_Sor.out', delimiter=' ',
          for l in lines:
             f.write(l)
             if printToConsole: print(l, end="")
-   
+
+
+def pNorm(v, p=1):
+    """Obtain the p-norm of a vector. Defaults to 1-norm.
+    
+    Args:
+        v (list):  Vector (list of floats)
+        p (number):  Power (float, or any number that can be converted
+            to a float).
+    
+    Returns:
+        norm (float):  The p-norm of the vector
+    """
+    if p == 1:
+        return sum(v)
+    p = float(p)
+    pInv = 1/p
+    spam = 0.0
+    for i in range(len(v)):
+        if p == 1:
+            spam += abs(v[i]) ** p
+        else:
+            spam += abs(v[i])
+    norm = spam ** pInv
+    return norm
+
 
 ########################################################################  
 #                                                                      #
@@ -220,32 +278,30 @@ def test():
     # Note that the integer values in col and rowStart are all one less
     # than those in the lecture notes as python enumerates list items
     # by starting from 0, whereas R starts from 1.
-    print('Testing makeSparse()...')
+    print('Testing make_sparse()...')
     print('A\t\t:  ' + str(A))
     val, col, rowStart = make_sparse(A)
     print('val\t\t:  ' + str(val))
     print('col\t\t:  ' + str(col))
     print('rowStart\t:  ' + str(rowStart))
-         
-    # Dummy data to validate sparse_sor; solution should be [3.0, 4.0]
-    # A = [[8.0, -1.0],[1.0, 2.0]]
-    # b = [20.0, 11.0]
-    # n = 2
     
-    # Test read_problem.
+    # Test read_problem
+    print('\nTesting read_problem...')
     A, b, n = read_problem('test.in')
-
-    # Test sparse_sor.
-    print('\nTesting sparseSOR()...')
     print('A\t\t:  ' + str(A))
     print('b\t\t:  ' + str(b))
     print('n\t\t:  ' + str(n))
-    x, k = sparse_sor(A, b, n, MAXITS, USER_EPSILON, MACHINE_EPSILON, OMEGA)
+    
+    # Test sparse_sor. Solution should be [3.0, 4.0]
+    print('\nTesting sparse_sor...')
+    x, k, stopReason = sparse_sor(A, b, n, MAXITS, OMEGA, MACHINE_EPSILON,
+                                  X_TOLERANCE, R_TOLERANCE)
     print('x\t\t:  ' + str(x))
     print('k\t\t:  ' + str(k))
     
     # Test write_solution.
-    write_solution(x, k, 'test.out', printToConsole=True)
+    print('\nTesting write_solution...')
+    write_solution(x, k, stopReason, 'test.out', printToConsole=True)
 
 # Run test.
 test()
