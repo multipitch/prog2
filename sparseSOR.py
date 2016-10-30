@@ -1,35 +1,25 @@
 """
 This module solves systems of linear equations of the form Ax = b.
 
-It reads from an input file containing A and b and outputs x to an
-output file, along with some other parameters
+The module reads from an input file containing A and b and outputs x to
+an output file, along with some other parameters.
 
-It was written for Python 3.* and has been tested on Python 3.5.2 and
-Python 2.7.12.
+The module was written for Python 3.* and has been tested on 
+Python 3.5.2 and Python 2.7.12.
 
 Authors:  Chris Kiernan, Eoin O'Driscoll, Sean Tully
-Version:  2
+Version:  3
 Date:     30th October 2016
-
 """
-from __future__ import (absolute_import, division, print_function, 
+from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 # The above line is required for compatibility with Python 2.7.
 
-import sys
+# TO DO:  Implement better error / exception handling
 
-MAXITS = 1000
-OMEGA = 1.3
-MACHINE_EPSILON = sys.float_info.epsilon
-X_TOLERANCE = 0.0
-R_TOLERANCE = 0.0
-USER_EPSILON = 0.0
-
-# TO DO:  Implement error / exception handling
-# TO DO:  Unit tests
 
 def sparse_sor(A, b, n, maxits, omega, machine_epsilon, x_tolerance=0.0,
-               r_tolerance=0.0, x=None):
+               r_tolerance=None, x=None):
     """Solves a system of linear equations of the form Ax = b.
         
     Args:
@@ -52,52 +42,64 @@ def sparse_sor(A, b, n, maxits, omega, machine_epsilon, x_tolerance=0.0,
         k (int):  The number of iterations taken.
         stopReason (str):  Reason for halting the function
     """
-    k = 0
-    
-    # Check matrix diagonal valued for zeros.
-    for i in range(n):
-        for j in range(n):
-            if A[i][j] == 0:
+    try:
+        k = 0
+        
+        # Check matrix diagonal values for zeros.
+        for i in range(n):
+            if A[i][i] == 0:
                 return None, k, 'Zero on Diagonal'
-                 
-    val, col, rowStart = make_sparse(A)  # Convert A to CSR format.
-            
-    if x is None:  # Construct initial x; elements must be non-zero.
-        x = [1] * n
+        
+        # Check for strict row or column dominance.
+        if not strict_dd_test(A):
+                return None, k, 'Not strictly row or column dominant'        
+                    
+        val, col, rowStart = make_sparse(A)  # Convert A to CSR format.
+                
+        if x is None:  # Construct initial x; elements must be != 0.
+            x = [1] * n
 
-    p = 2  # Parameter for p-norm calculation.
-    pInv = 1/float(p)
-    
-    # Main iteration.
-    while k < maxits:
-        xOld = x[:]
-        for i in range(n):
-            spam = 0.0
-            for j in range(rowStart[i], rowStart[i + 1]):
-                spam += val[j] * x[col[j]]
-                if col[j] == i:
-                    d = val[j]
-            x[i] += omega * (b[i] - spam)/d
-        k += 1
+        px = 2  # Parameter for p-norm calculation on x.
+        pr = 2  # Parameter for p-norm calculation on residual.
         
-        # Calculate p-norms for x.
-        p = 2
-        xNorm = pNorm(x, 2)
-        deltax = []
-        for i in range(n):
-            deltax.append(x[i] - xOld[i])
-        deltaxNorm = pNorm(deltax, 2)
+        # Main iteration.
+        while k < maxits:
+            xOld = x[:]
+            for i in range(n):
+                spam = 0.0
+                for j in range(rowStart[i], rowStart[i + 1]):
+                    spam += val[j] * x[col[j]]
+                    if col[j] == i:
+                        d = val[j]
+                x[i] += omega * (b[i] - spam)/d
+            k += 1
+            
+            # Calculate p-norms for x.
+            xNorm = p_norm(x, px)
+            deltax = []
+            for i in range(n):
+                deltax.append(x[i] - xOld[i])
+            deltaxNorm = p_norm(deltax, px)
+            
+            # Calculate p-norm of residual.
+            Ax = Ab(A, x)
+            res = [bi - Axi for bi, Axi in zip(b, Ax)]
+            resNorm = p_norm(res, pr)
+            
+            # Perform halting tests.
+            if k > 1 and deltaxNorm > deltaxNormOld:
+                return None, k, 'x Sequence divergence' 
+            if deltaxNorm <= x_tolerance + 4.0 * machine_epsilon * xNorm:
+                return x, k, 'x Sequence convergence'
+            if r_tolerance is not None:
+                if resNorm <= r_tolerance + 4.0 * machine_epsilon * xNorm:
+                    return x, k, 'Residual convergence' 
+                           
+            deltaxNormOld = deltaxNorm            
+        return x, k, 'Max Iterations reached'
         
-        # TO DO:  Implement residual calculation, halting test.
-        
-        # Perform halting tests.
-        if deltaxNorm <= x_tolerance + 4.0 * machine_epsilon * xNorm:
-            return x, k, 'x Sequence convergence'
-        if k > 1 and deltaxNorm > deltaxNormOld:
-            return None, k, 'x Sequence divergence'     
-        deltaxNormOld = deltaxNorm
-        
-    return x, k, 'Max Iterations reached'
+    except:
+        return None, k, 'Cannot proceed'
 
 
 def make_sparse(A, m=None, n=None):
@@ -147,7 +149,6 @@ def make_sparse(A, m=None, n=None):
     
     # Note a 'hanging' column position is required:
     rowStart.append(colPos + 1)
-
     return val, col, rowStart
 
 
@@ -175,25 +176,31 @@ def read_problem(filename='nas_Sor.in', delimiter=' '):
         b (list):  A vector of n floats.
         n (int):  Corresponds to the dimensions of A and b above.
     """
-    A = []
-    
+    A = []    
     with open(filename, 'r') as f:
         n = int(f.readline())
         for line in range(n):
            A.append(list(float(i) for i in f.readline().split(delimiter)))
-        b = list(float(i) for i in f.readline().split(delimiter))
-        
+        b = list(float(i) for i in f.readline().split(delimiter))        
     return A, b, n
 
 
-def write_solution(x, k, stopReason, filename='nas_Sor.out', delimiter=' ', 
-                  printToConsole=None):
+def write_solution(x, stopReason, maxits, k, machine_epsilon, x_tolerance,
+                   r_tolerance, filename='nas_Sor.out', delimiter=' ', 
+                   printToConsole=None):
     """Write solution to a file.
     
     Args:
         x (list):  Solution vector; a list of n floats.
-        k (int):  The number of iterations taken.
         stopReason (str):  Reason for halting the sparse_sor function.
+        maxits (int):  The maximum number of iterations to attempt.
+        k (int):  The number of iterations taken.
+        machine_epsilon:  Machine error tolerance for float operations.
+        x_tolerance (float):  User-specified tolerance in successive x
+            approximations (optional).
+        r_tolerance (float or None):  User-specified tolerance in 
+            successive residual approximations (if None, this means the 
+            residual tolerance test has not been applied.            
         filename (str):  The filename (optional).
         delimiter (str):  The delimiter to use between the values of x
             (optional).
@@ -201,14 +208,13 @@ def write_solution(x, k, stopReason, filename='nas_Sor.out', delimiter=' ',
             (optional).
     
     """
-    
     titles = ['Stopping reason','Max num of iterations','Number of iterations',
               'Machine epsilon','X seq tolerance']
-    params = [str(stopReason), str(MAXITS), str(k), str(MACHINE_EPSILON),
-              str(X_TOLERANCE)]
-    if R_TOLERANCE == None:
+    params = [str(stopReason), str(maxits), str(k), str(machine_epsilon),
+              str(x_tolerance)]
+    if r_tolerance is not None:
         titles.append('Residual seq tolerance')
-        params.append(str(R_TOLERANCE))
+        params.append(str(r_tolerance))
 
     # Pad titles and parameters with spaces to justify text.
     offset = 2
@@ -222,17 +228,18 @@ def write_solution(x, k, stopReason, filename='nas_Sor.out', delimiter=' ',
     lines[0] = lines[0] + titles[lt - 1] + '\n'  # Don't pad last title.
     lines[1] = lines[1] + params[lt - 1] + '\n'  # Don't pad last param.
     
-    # Construct results line using delimiter.
-    lines.append(delimiter.join(str(i) for i in x) + '\n')
+    # Construct results line using delimiter (if solution obtained).
+    if x is not None:
+        lines.append(delimiter.join(str(i) for i in x) + '\n')
     
     # Write out the file and optionally print to screen if required.
     with open(filename, 'w') as f:
          for l in lines:
             f.write(l)
-            if printToConsole: print(l, end="")
+            if printToConsole is not None: print(l, end="")
 
 
-def pNorm(v, p=1):
+def p_norm(v, p=1):
     """Obtain the p-norm of a vector. Defaults to 1-norm.
     
     Args:
@@ -257,52 +264,49 @@ def pNorm(v, p=1):
     return norm
 
 
-########################################################################  
-#                                                                      #
-#     TESTING                                                          #
-#                                                                      #
-########################################################################
-def test():
-    """Perform a range of general tests on module functions."""
+def strict_dd_test(A, n=None):
+    """Checks if an n x n matrix, A is strictly diagonal dominant.
     
-    # Dummy data to validate make_sparse as per p.79 of Chapter 4 of the
-    # lecture notes.
-    A = [[21.0,  0.0,  0.0, 12.0,  0.0,  0.0],
-         [ 0.0,  0.0, 49.0,  0.0,  0.0,  0.0],
-         [31.0, 16.0,  0.0,  0.0,  0.0, 23.0],
-         [ 0.0,  0.0,  0.0, 85.0,  0.0,  0.0],
-         [55.0,  0.0,  0.0,  0.0, 91.0,  0.0],
-         [ 0.0,  0.0,  0.0,  0.0,  0.0, 41.0]]
-
-    # Test make_sparse.
-    # Note that the integer values in col and rowStart are all one less
-    # than those in the lecture notes as python enumerates list items
-    # by starting from 0, whereas R starts from 1.
-    print('Testing make_sparse()...')
-    print('A\t\t:  ' + str(A))
-    val, col, rowStart = make_sparse(A)
-    print('val\t\t:  ' + str(val))
-    print('col\t\t:  ' + str(col))
-    print('rowStart\t:  ' + str(rowStart))
+    Args:
+        A (list):  An n x n matrix represented as a list of n rows,
+            each containing a list of n values as floats.
+        n (int):  Corresponds to the dimensions of A above (optional).
+        
+    Returns
+        strictlyDiagonalDominant (bool):  True if matrix is strictly
+            diagonal dominant (i.e. strictly row dominant or strictly
+            column dominant.
+    """
+    if n is None:
+        n = len(A)
+    At = zip(*A)
+    strictlyRowDominant = True
+    strictlyDiagonalDominant = True
+    n = len(A[0])
+    for i in range(n):  # Check for strict row dominance.
+        if 2 * A[i][i] < sum(A[i]): 
+            strictlyRowDominant = False
+            break
+    if not strictlyRowDominant: # Check for strick column dominance.
+        i = 0
+        for cols in At:
+            if 2 * A[i][i] < sum(cols):
+                strictlyDiagonalDominant = False
+            i += 1
+    return strictlyDiagonalDominant
     
-    # Test read_problem
-    print('\nTesting read_problem...')
-    A, b, n = read_problem('test.in')
-    print('A\t\t:  ' + str(A))
-    print('b\t\t:  ' + str(b))
-    print('n\t\t:  ' + str(n))
     
-    # Test sparse_sor. Solution should be [3.0, 4.0]
-    print('\nTesting sparse_sor...')
-    x, k, stopReason = sparse_sor(A, b, n, MAXITS, OMEGA, MACHINE_EPSILON,
-                                  X_TOLERANCE, R_TOLERANCE)
-    print('x\t\t:  ' + str(x))
-    print('k\t\t:  ' + str(k))
+def Ab(A, b):
+    """Multiplies an m x n matrix, A, by a vector, b, of length n.
     
-    # Test write_solution.
-    print('\nTesting write_solution...')
-    write_solution(x, k, stopReason, 'test.out', printToConsole=True)
-
-# Run test.
-test()
+    Args:
+        A (list):  An l x m matrix represented as a list of l rows, each
+            containing a list of m values as floats.
+        b (list):  A vector of n floats.
+            
+    Returns:
+        c (list):  A vector of n floats.
+    """
+    c = [sum(a*b for a, b in zip(aRow, b)) for aRow in A]
+    return c
 
