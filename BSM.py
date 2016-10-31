@@ -101,7 +101,7 @@ def construct_BSM(T, X, Smax, M, N, r, sigma):
     return A, fM, N
 
    
-def write_BSM_problem(A, b, n, delimiter=' ', filename='nas_Sor.in'):
+def write_BSM_problem(A, b, n, delimiter=' ', filename='nas_BSM.in'):
     """Writes initial BSM data to a file."""
     with open(filename, 'w') as f:
         data = str(n) + '\n'

@@ -26,13 +26,13 @@ MACHINE_EPSILON = sys.float_info.epsilon
 X_TOLERANCE = 1e-06
 R_TOLERANCE = 1e-06
   
-T = 12.0
-X = 100.0
-Smax = 150.0
-M = 12
-N = 151
-r = 0.04
-sigma = 0.27
+T = 90.0                    # 90 day time period.
+X = 10.0                    # $10 strike price at expiry.
+Smax = 25.0                 # $25 maximum price.
+M = int(T)                  # Time interval of one day.
+N = 251                     # Price interval of $0.10.
+r = 0.02 * T / 365.0        # Risk-free annual interest rate of 4 %.
+sigma = 0.3                 # Volatility of 0.3.  
 
 # Run model with above parameters.
 A, b, fM = construct_BSM(T, X, Smax, M, N, r, sigma)
@@ -45,8 +45,8 @@ write_BSM_solution(F, filename='BSM_test.out')
 # Create a surface plot showing option value as a function of the price
 # of the underlying stock and the number of days until expiry.
 Z = np.array(F)
-x = np.arange(0,N-1,1)
-y = np.arange(0,M+1,1)
+x = np.arange(0, N - 1, 1)
+y = np.arange(0, M + 1, 1)
 X, Y = np.meshgrid(x, y)
 fig = plt.figure()
 ax = fig.gca(projection='3d')
