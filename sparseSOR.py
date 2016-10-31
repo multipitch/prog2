@@ -283,15 +283,22 @@ def strict_dd_test(A, n=None):
     strictlyDiagonalDominant = True
     n = len(A[0])
     for i in range(n):  # Check for strict row dominance.
-        if 2 * A[i][i] < sum(A[i]): 
+        spam = 0
+        for j in range(n):
+            if j != i:
+                spam += abs(A[i][j])
+        if abs(A[i][i]) < spam:
             strictlyRowDominant = False
             break
-    if not strictlyRowDominant: # Check for strick column dominance.
-        i = 0
-        for cols in At:
-            if 2 * A[i][i] < sum(cols):
+    if not strictlyRowDominant: # Check for strict column dominance.
+        for j in range(n):
+            spam = 0
+            for i in range(n):
+                if i != j:
+                    spam += abs(A[i][j])
+            if abs(A[j][j]) < spam:
                 strictlyDiagonalDominant = False
-            i += 1
+                break
     return strictlyDiagonalDominant
     
     
