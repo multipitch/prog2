@@ -1,15 +1,14 @@
 """
-This module solves systems of linear equations of the form Ax = b.
-
-The module reads from an input file containing A and b and outputs x to
-an output file, along with some other parameters.
+This module contains a function to solve systems of linear equations of
+the form Ax = b as well as additional functions to I/O and for
+performing some matrix operations.
 
 The module was written for Python 3.* and has been tested on 
 Python 3.5.2 and Python 2.7.12.
 
 Authors:  Chris Kiernan, Eoin O'Driscoll, Sean Tully
-Version:  3
-Date:     30th October 2016
+Version:  4
+Date:     31st October 2016
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
@@ -236,7 +235,7 @@ def write_solution(x, stopReason, maxits, k, machine_epsilon, x_tolerance,
     with open(filename, 'w') as f:
          for l in lines:
             f.write(l)
-            if printToConsole is not None: print(l, end="")
+            if printToConsole is True: print(l, end="")
 
 
 def p_norm(v, p=1):
