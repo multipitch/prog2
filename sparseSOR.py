@@ -105,7 +105,7 @@ def make_sparse(A, m=None, n=None):
     """Converts a matrix to compressed sparse row (CSR) format.
     
     Args:
-        A (list):  An n x n matrix represented as a list of n rows, each
+        A (list):  An m x n matrix represented as a list of m rows, each
             containing a list of n values as floats.
         m (int):  Number of rows in A (optional). If m is not
             specified, it is calculated.
@@ -278,10 +278,8 @@ def strict_dd_test(A, n=None):
     """
     if n is None:
         n = len(A)
-    At = zip(*A)
     strictlyRowDominant = True
     strictlyDiagonalDominant = True
-    n = len(A[0])
     for i in range(n):  # Check for strict row dominance.
         spam = 0
         for j in range(n):
