@@ -10,8 +10,8 @@ The module was written for Python 3.* and has been tested on
 Python 3.5.2 and Python 2.7.12.
 
 Authors:  Chris Kiernan, Eoin O'Driscoll, Sean Tully
-Version:  1
-Date:     30th October 2016
+Version:  2
+Date:     6th November 2016
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
@@ -19,8 +19,9 @@ from __future__ import (absolute_import, division, print_function,
 
 from sparseSOR import *
 
-def solve_BSM(A, fM, N, Smax, M, maxits, omega, machine_epsilon, x_tolerance,
-              r_tolerance):
+
+def solve_BSM(A, fM, fmod, M, N, X, maxits, omega, machine_epsilon, 
+              x_tolerance, r_tolerance):
     """Solve an instance of the Black-Scholes-Merton problem.
     
     Args:
@@ -29,7 +30,6 @@ def solve_BSM(A, fM, N, Smax, M, maxits, omega, machine_epsilon, x_tolerance,
         fM (list):  A vector of N-1 floats, representing the solution
             at expiry.
         N (integer):  Number of time increments.
-        Smax (float):   Maximum price of underlying stock.
         M (int):    Number of price increments.
         maxits (int):  The maximum number of iterations to attempt.
         omega (float):  Relaxation parameter.
@@ -46,16 +46,18 @@ def solve_BSM(A, fM, N, Smax, M, maxits, omega, machine_epsilon, x_tolerance,
             column containing the solutions at expiry and subsequent
             columns containing sulutions at preceding time increments.
     """
-    F = [[None] for m in range(M + 1)]
-    F[0] = fM[:]
-    for m in range(M):
-        fM = sparse_sor(A, fM, N - 1, maxits, omega, machine_epsilon,
-                        x_tolerance, r_tolerance)[0]
-        if fM is None:
-            # TO DO: Raise error.
-            print('Uh oh.')
+    F = [fM[:]]
+    b = fM[1:-1]
+    for m in range(1, M + 1):
+        b[0] += fmod
+        x, k, stopReason = sparse_sor(A, b, N - 1, maxits, omega,
+                                       machine_epsilon, x_tolerance,
+                                       r_tolerance)
+        if x is None:
+            print(stopReason + ' for iteration ' + str(k))
             return None
-        F[m+1] = fM[:]
+        F.append([X] + x[:] + [0.0])
+        b = x[:]
     return F
 
 
@@ -67,38 +69,49 @@ def construct_BSM(T, X, Smax, M, N, r, sigma):
         X (float):  Strike price of option at time T.
         Smax (float):   Maximum price of underlying stock.
         M (int):    Number of price increments.
-        N (integer):  Number of time increments.
+        N (int):  Number of time increments.
         r (float):  Risk-free interest rate.
         sigma (float):  Volatility of stock price.
         
     Returns:
         A (list):  An (N-1) x (N-1) matrix represented as a list of
             N-1 rows, each containing a list of N-1 values as floats.
-        fM (list):  A vector of N-1 floats, representing the solution
+        fM (list):  A vector of N+1 floats, representing the solution
             at expiry.
-        N (integer):  Number of time increments.
+        fmod (float):  Number to be added to the second element of the
+            f(m+1) vector before using it to find fm vector.
     """
-    h = float(Smax) / float(N)
-    k = float(T) / float(M)
+    # Ensure all float parameters are correctly cast
+    T = float(T)
+    X = float(X)
+    Smax = float(Smax)
+    r = float(r)
+    sigma = float(sigma)
+    
+    h = Smax / float(N)
+    k = T / float(M)
 
     # Initialise A and fM with zeros.
-    fM = [0] * (N - 1)
-    A = [fM[:] for n in range(N - 1)]
+    fM = [0.0] * (N + 1)
+    A = [[0.0] * (N - 1) for n in range(N - 1)]
     
     # Populate matrix A with values.
-    for n in range(N - 1):
+    A[0][0] = 1.0 + k * (r + sigma * sigma) # Set first diagonal
+    for n in range(1, N - 1):
         # Set diagonal values.
-        A[n][n] = 1.0 + k * r + k * sigma * sigma * (n + 1) * (n + 1)
-        if n > 0:
-            # Set values above diagonal.
-            A[n-1][n] = -0.5 * n * k * (n * sigma * sigma + r)
-            # Set values below diagonal.
-            A[n][n-1] = -0.5 * (n + 1) * k * ((n + 1) * sigma * sigma - r)
-    
-    # Populate matrix B with values.
-    for n in range(N-1):
+        A[n][n] = 1.0 + k * (r + sigma * sigma * (n + 1) * (n + 1))
+        # Set values above diagonal.
+        A[n-1][n] = -0.5 * n * k * (n * sigma * sigma + r)
+        # Set values below diagonal.
+        A[n][n-1] = -0.5 * (n + 1) * k * ((n + 1) * sigma * sigma - r)
+        
+    # Populate vector fM with values.
+    for n in range(N+1):
         fM[n] = max(X - n * h, 0.0) 
-    return A, fM, N
+    
+    # Calculate fmod
+    fmod = 0.5 * k * (sigma * sigma - r) * X
+    return A, fM, fmod
 
    
 def write_BSM_problem(A, b, n, delimiter=' ', filename='nas_BSM.in'):

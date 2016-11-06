@@ -5,8 +5,8 @@ The module was written for Python 3.* and has been tested on
 Python 3.5.2 and Python 2.7.12.
 
 Authors:  Chris Kiernan, Eoin O'Driscoll, Sean Tully
-Version:  1
-Date:     30th October 2016
+Version:  2
+Date:     6th November 2016
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
@@ -19,42 +19,70 @@ from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.sparse.linalg import spsolve
+from scipy.sparse import csr_matrix
 
 MAXITS = 1000
 OMEGA = 1.3
 MACHINE_EPSILON = sys.float_info.epsilon
-X_TOLERANCE = 1e-06
-R_TOLERANCE = 1e-06
+X_TOLERANCE = 1e-10
+R_TOLERANCE = 1e-10
   
-T = 90.0                    # 90 day time period.
-X = 10.0                    # $10 strike price at expiry.
-Smax = 25.0                 # $25 maximum price.
-M = int(T)                  # Time interval of one day.
-N = 251                     # Price interval of $0.10.
-r = 0.02 * T / 365.0        # Risk-free annual interest rate of 4 %.
-sigma = 0.3                 # Volatility of 0.3.  
+T = 90.0
+X = 50.0
+Smax = 100.0
+M = 16
+N = 16
+rAnnual = 0.02
+r = rAnnual * T / 365.0
+sigma = 0.3
+
 
 # Run model with above parameters.
-A, b, fM = construct_BSM(T, X, Smax, M, N, r, sigma)
-F = solve_BSM(A, b, fM, Smax, M, MAXITS, OMEGA, MACHINE_EPSILON, X_TOLERANCE,
-              R_TOLERANCE)
+A, fM, fmod = construct_BSM(T, X, Smax, M, N, r, sigma)
+
+F = solve_BSM(A, fM, fmod, M, N, X, MAXITS, OMEGA, MACHINE_EPSILON,
+              X_TOLERANCE, R_TOLERANCE)
+              
+
+# Run using scipy
+'''
+def scipy_BSM(A, fM, fmod):
+    Acsr = csr_matrix(A)
+    F = [fM[:]]
+    b = fM[1:-1]
+    for m in range(1, M + 1):
+        b[0] += fmod
+        x = spsolve(Acsr, b).tolist()
+        if x is None:
+            return None
+        F.append([X] + x[:] + [0.0])
+        b = x[:]
+    return F
+    
+F = scipy_solve(A, fM, fmod)
+'''
+
 
 # Write solutions to a file.
 write_BSM_solution(F, filename='BSM_test.out')
 
 # Create a surface plot showing option value as a function of the price
 # of the underlying stock and the number of days until expiry.
+h = float(Smax) / float(N)
+k = float(T) / float(M)
 Z = np.array(F)
-x = np.arange(0, N - 1, 1)
-y = np.arange(0, M + 1, 1)
+x = np.linspace(0, Smax, N + 1)
+y = np.linspace(0, T, M + 1)
 X, Y = np.meshgrid(x, y)
 fig = plt.figure()
 ax = fig.gca(projection='3d')
 surf = ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm,
                        linewidth=0, antialiased=False)
-xLabel = ax.set_xlabel('Stock price')
-yLabel = ax.set_ylabel('Days to expiry')
-zLabel = ax.set_zlabel('Strike price')
+xLabel = ax.set_xlabel(r'$S$')
+yLabel = ax.set_ylabel(r'$T - t$')
+zLabel = ax.set_zlabel(r'$f$')
+#plt.show()
 plt.savefig('BSM_test.pdf')
 plt.close('all')
 

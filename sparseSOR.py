@@ -7,8 +7,8 @@ The module was written for Python 3.* and has been tested on
 Python 3.5.2 and Python 2.7.12.
 
 Authors:  Chris Kiernan, Eoin O'Driscoll, Sean Tully
-Version:  4
-Date:     31st October 2016
+Version:  5
+Date:     6th November 2016
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
@@ -17,13 +17,13 @@ from __future__ import (absolute_import, division, print_function,
 # TO DO:  Implement better error / exception handling
 
 
-def sparse_sor(A, b, n, maxits, omega, machine_epsilon, x_tolerance=0.0,
-               r_tolerance=None, x=None):
+def sparse_sor(A, b, n, maxits, omega, machine_epsilon,
+               x_tolerance=0.0, r_tolerance=None, x=None):
     """Solves a system of linear equations of the form Ax = b.
         
     Args:
-        A (list):  An n x n matrix represented as a list of n rows,
-            each containing a list of n values as floats.
+        A (list):  An n x n matrix represented as a list of n rows, each
+            containing a list of n values as floats.
         b (list):  A vector of n floats.
         n (int):  Corresponds to the dimensions of A and b above.
         maxits (int):  The maximum number of iterations to attempt.
@@ -43,24 +43,39 @@ def sparse_sor(A, b, n, maxits, omega, machine_epsilon, x_tolerance=0.0,
     """
     try:
         k = 0
-        
+       
+        # TO DO:
+        #Next 3 blocks don't need to happen every time for BSM so
+        #should be taken outside this function (also to allow drop-in
+        #replacement of scipy solver.
+        #Function should be passed sparse format matrix also.
+        #Note that this would make residual calculation very difficult.
+        #
         # Check matrix diagonal values for zeros.
         for i in range(n):
             if A[i][i] == 0:
+                print("aaaa")
                 return None, k, 'Zero on Diagonal'
         
         # Check for strict row or column dominance.
         if not strict_dd_test(A):
-                return None, k, 'Not strictly row or column dominant'        
+            print("bbbb")
+            return None, k, 'Not strictly row or column dominant'        
                     
-        val, col, rowStart = make_sparse(A)  # Convert A to CSR format.
-                
-        if x is None:  # Construct initial x; elements must be != 0.
-            x = [1] * n
-
-        px = 2  # Parameter for p-norm calculation on x.
-        pr = 2  # Parameter for p-norm calculation on residual.
+        # Convert matrix to CSR format
+        val, col, rowStart = make_sparse(A, n)
         
+        # Can't start with a guess containing zeros
+        if x is not None:
+            for i in x:
+                if i == 0:
+                    x = None
+        
+        # If no (valid) starting guess, construct initial x; (elements
+        # must be != 0).
+        if x is None: 
+            x = [1] * n
+   
         # Main iteration.
         while k < maxits:
             xOld = x[:]
@@ -73,18 +88,18 @@ def sparse_sor(A, b, n, maxits, omega, machine_epsilon, x_tolerance=0.0,
                 x[i] += omega * (b[i] - spam)/d
             k += 1
             
-            # Calculate p-norms for x.
-            xNorm = p_norm(x, px)
+            # Calculate 1-norms for x.
+            xNorm = p_norm(x)
             deltax = []
             for i in range(n):
                 deltax.append(x[i] - xOld[i])
-            deltaxNorm = p_norm(deltax, px)
+            deltaxNorm = p_norm(deltax)
             
-            # Calculate p-norm of residual.
+            # Calculate 1-norm of residual.
             Ax = Ab(A, x)
             res = [bi - Axi for bi, Axi in zip(b, Ax)]
-            resNorm = p_norm(res, pr)
-            
+            resNorm = p_norm(res)
+
             # Perform halting tests.
             if k > 1 and deltaxNorm > deltaxNormOld:
                 return None, k, 'x Sequence divergence' 
@@ -98,8 +113,23 @@ def sparse_sor(A, b, n, maxits, omega, machine_epsilon, x_tolerance=0.0,
         return x, k, 'Max Iterations reached'
         
     except:
+        print("ddddd")
         return None, k, 'Cannot proceed'
 
+
+def test_matrix(A):
+    # Check for zeros on the diagonal
+    for i in range(n):
+        if A[i][i] == 0:
+            print("aaaa")
+            return False, 'Zero on Diagonal'
+    
+    # Check for strict row or column dominance.
+    if not strict_dd_test(A):
+        print("bbbb")
+        return False, 'Not strictly row or column dominant'   
+    
+    return True, None
 
 def make_sparse(A, m=None, n=None):
     """Converts a matrix to compressed sparse row (CSR) format.
@@ -249,6 +279,33 @@ def p_norm(v, p=1):
     Returns:
         norm (float):  The p-norm of the vector
     """
+    # Use simpler equation for 1-norm
+    if p == 1:
+        norm = 0.0
+        for n in v:
+            norm += abs(n)
+        return norm
+    # Use powers for other norms    
+    else:
+        p = float(p)
+        spam = 0.0
+        for n in v:
+            spam += abs(n) ** p
+        norm = spam ** (1/p)
+        return norm    
+
+'''
+def p_norm(v, p=1):
+    """Obtain the p-norm of a vector. Defaults to 1-norm.
+    
+    Args:
+        v (list):  Vector (list of floats)
+        p (number):  Power (float, or any number that can be converted
+            to a float).
+    
+    Returns:
+        norm (float):  The p-norm of the vector
+    """
     if p == 1:
         return sum(v)
     p = float(p)
@@ -261,6 +318,7 @@ def p_norm(v, p=1):
             spam += abs(v[i])
     norm = spam ** pInv
     return norm
+'''
 
 
 def strict_dd_test(A, n=None):

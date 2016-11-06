@@ -5,8 +5,8 @@ The module was written for Python 3.* and has been tested on
 Python 3.5.2 and Python 2.7.12.
 
 Authors:  Chris Kiernan, Eoin O'Driscoll, Sean Tully
-Version:  1
-Date:     30th October 2016
+Version:  2
+Date:     6th November 2016
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
@@ -18,8 +18,8 @@ from sparseSOR import *
 MAXITS = 1000
 OMEGA = 1.3
 MACHINE_EPSILON = sys.float_info.epsilon
-X_TOLERANCE = 1e-06
-R_TOLERANCE = 1e-06
+X_TOLERANCE = 1e-10
+R_TOLERANCE = 1e-10
 
 def test_gen():
     """Perform a range of general tests on module functions."""
@@ -53,8 +53,8 @@ def test_gen():
     
     # Test sparse_sor. Solution should be [3.0, 4.0]
     print('\nTesting sparse_sor...')
-    x, k, stopReason = sparse_sor(A, b, n, MAXITS, OMEGA, MACHINE_EPSILON,
-                                  X_TOLERANCE, R_TOLERANCE)
+    x, k, stopReason = sparse_sor(A, b, n, MAXITS, OMEGA,
+                                  MACHINE_EPSILON, X_TOLERANCE, R_TOLERANCE)
     print('x\t\t:  ' + str(x))
     print('k\t\t:  ' + str(k))
     
