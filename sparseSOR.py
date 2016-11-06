@@ -18,7 +18,7 @@ from __future__ import (absolute_import, division, print_function,
 
 
 def sparse_sor(A, b, n, maxits, omega, machine_epsilon,
-               x_tolerance=0.0, r_tolerance=None, x=None):
+               x_tolerance=0.0, r_tolerance=None, x=None, sparseInput= None):
     """Solves a system of linear equations of the form Ax = b.
         
     Args:
@@ -35,7 +35,9 @@ def sparse_sor(A, b, n, maxits, omega, machine_epsilon,
             residual approximations (optional).
         x (list):  Initial guess for solution vector; a list of n floats
             (optional). If blank, x = [1, 1, ... , 1] is assumed.
-    
+        sparseInput (tuple):  Optional output of make_sparse(A).  If
+            this is specified, sparse_sor doesn't test A or call
+            make_sparse - useful if running many times on the same A.    
     Returns:
         x (list):  Solution vector; a list of n floats.
         k (int):  The number of iterations taken.
@@ -43,28 +45,27 @@ def sparse_sor(A, b, n, maxits, omega, machine_epsilon,
     """
     try:
         k = 0
-       
-        # TO DO:
-        #Next 3 blocks don't need to happen every time for BSM so
-        #should be taken outside this function (also to allow drop-in
-        #replacement of scipy solver.
-        #Function should be passed sparse format matrix also.
-        #Note that this would make residual calculation very difficult.
-        #
-        # Check matrix diagonal values for zeros.
-        for i in range(n):
-            if A[i][i] == 0:
-                print("aaaa")
-                return None, k, 'Zero on Diagonal'
         
-        # Check for strict row or column dominance.
-        if not strict_dd_test(A):
-            print("bbbb")
-            return None, k, 'Not strictly row or column dominant'        
-                    
-        # Convert matrix to CSR format
-        val, col, rowStart = make_sparse(A, n)
-        
+        # For applications such as BSM, matrix A doesn't change, so no
+        # need to test it and make it sparse every time it runs.
+        if not sparseInput:
+            # Check matrix diagonal values for zeros.
+            for i in range(n):
+                if A[i][i] == 0:
+                    print("aaaa")
+                    return None, k, 'Zero on Diagonal'
+            
+            # Check for strict row or column dominance.
+            if not strict_dd_test(A):
+                print("bbbb")
+                return None, k, 'Not strictly row or column dominant'        
+                        
+            # Convert matrix to CSR format
+            val, col, rowStart = make_sparse(A, n)
+            
+        else:
+            val, col, rowStart = sparseInput
+
         # Can't start with a guess containing zeros
         if x is not None:
             for i in x:
@@ -74,8 +75,8 @@ def sparse_sor(A, b, n, maxits, omega, machine_epsilon,
         # If no (valid) starting guess, construct initial x; (elements
         # must be != 0).
         if x is None: 
-            x = [1] * n
-   
+            x = [1.0] * n
+               
         # Main iteration.
         while k < maxits:
             xOld = x[:]
@@ -107,29 +108,14 @@ def sparse_sor(A, b, n, maxits, omega, machine_epsilon,
                 return x, k, 'x Sequence convergence'
             if r_tolerance is not None:
                 if resNorm <= r_tolerance + 4.0 * machine_epsilon * xNorm:
-                    return x, k, 'Residual convergence' 
-                           
+                    return x, k, 'Residual convergence'                          
+            
             deltaxNormOld = deltaxNorm            
         return x, k, 'Max Iterations reached'
         
     except:
-        print("ddddd")
         return None, k, 'Cannot proceed'
 
-
-def test_matrix(A):
-    # Check for zeros on the diagonal
-    for i in range(n):
-        if A[i][i] == 0:
-            print("aaaa")
-            return False, 'Zero on Diagonal'
-    
-    # Check for strict row or column dominance.
-    if not strict_dd_test(A):
-        print("bbbb")
-        return False, 'Not strictly row or column dominant'   
-    
-    return True, None
 
 def make_sparse(A, m=None, n=None):
     """Converts a matrix to compressed sparse row (CSR) format.
@@ -153,7 +139,7 @@ def make_sparse(A, m=None, n=None):
             starts in val and col.
     """
     if n is None: 
-        if m is None:  # Calculate dimensions if not specified.
+        if m is None:  # Calculate dimensions if none specified.
             m = len(A)    
             n = len(A[0])            
         n = m  # Assume square if only one dimension is specified.
@@ -175,9 +161,9 @@ def make_sparse(A, m=None, n=None):
                 if rs:
                     rowStart.append(colPos)
                     rs = False
-    
-    # Note a 'hanging' column position is required:
+    # Note a 'hanging' column position is required for CSR fomat:
     rowStart.append(colPos + 1)
+    
     return val, col, rowStart
 
 
@@ -294,35 +280,9 @@ def p_norm(v, p=1):
         norm = spam ** (1/p)
         return norm    
 
-'''
-def p_norm(v, p=1):
-    """Obtain the p-norm of a vector. Defaults to 1-norm.
-    
-    Args:
-        v (list):  Vector (list of floats)
-        p (number):  Power (float, or any number that can be converted
-            to a float).
-    
-    Returns:
-        norm (float):  The p-norm of the vector
-    """
-    if p == 1:
-        return sum(v)
-    p = float(p)
-    pInv = 1/p
-    spam = 0.0
-    for i in range(len(v)):
-        if p == 1:
-            spam += abs(v[i]) ** p
-        else:
-            spam += abs(v[i])
-    norm = spam ** pInv
-    return norm
-'''
-
 
 def strict_dd_test(A, n=None):
-    """Checks if an n x n matrix, A is strictly diagonal dominant.
+    """Checks if an n x n matrix, A, is strictly diagonal dominant.
     
     Args:
         A (list):  An n x n matrix represented as a list of n rows,

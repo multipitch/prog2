@@ -27,10 +27,12 @@ def solve_BSM(A, fM, fmod, M, N, X, maxits, omega, machine_epsilon,
     Args:
         A (list):  An (N-1) x (N-1) matrix represented as a list of
             N-1 rows, each containing a list of N-1 values as floats.
-        fM (list):  A vector of N-1 floats, representing the solution
-            at expiry.
-        N (integer):  Number of time increments.
+        fM (list):  A vector of N+1 floats, representing the option 
+            price at maturity.
+        fmod (float):  Number to be added to the second element of the
+            f(m+1) vector before using it to find fm vector.        
         M (int):    Number of price increments.
+        N (integer):  Number of time increments.
         maxits (int):  The maximum number of iterations to attempt.
         omega (float):  Relaxation parameter.
         machine_epsilon:  Machine error tolerance for float operations.
@@ -40,22 +42,37 @@ def solve_BSM(A, fM, fmod, M, N, X, maxits, omega, machine_epsilon,
             residual approximations (optional).
         
     Returns:
-        F (list):  An (M+1) x (N-1) matrix represented as a list of
-            M+1 rows, each containing a list of N-1 values as floats.
-            Each column contains a solution vector, f, with the first
-            column containing the solutions at expiry and subsequent
-            columns containing sulutions at preceding time increments.
+        F (list):  An (M+1) x (N+1) matrix represented as a list of
+            lists of floats.  Each list of floats represents a column 
+            vector, f, of option prices as a function of stock price at
+            a particular time, with the first such list representing f
+            at maturity and subsequent lists representing the vector f
+            at preceding time increments.
     """
+    # Check for zeros on the diagonal
+    for i in range(N-1):
+        if A[i][i] == 0:
+            print('Zero on Diagonal')
+            return
+    
+    # Check for strict row or column dominance.
+    if not strict_dd_test(A):
+        print('Not strictly row or column dominant')
+        return
+        
+    sparseInput = make_sparse(A)
     F = [fM[:]]
     b = fM[1:-1]
-    for m in range(1, M + 1):
+    bPrev = []                    
+    for m in range(M):
+        bPrev = b[:]
         b[0] += fmod
         x, k, stopReason = sparse_sor(A, b, N - 1, maxits, omega,
-                                       machine_epsilon, x_tolerance,
-                                       r_tolerance)
+                                      machine_epsilon, x_tolerance,
+                                      r_tolerance, bPrev, sparseInput)
         if x is None:
             print(stopReason + ' for iteration ' + str(k))
-            return None
+            return
         F.append([X] + x[:] + [0.0])
         b = x[:]
     return F
@@ -76,8 +93,8 @@ def construct_BSM(T, X, Smax, M, N, r, sigma):
     Returns:
         A (list):  An (N-1) x (N-1) matrix represented as a list of
             N-1 rows, each containing a list of N-1 values as floats.
-        fM (list):  A vector of N+1 floats, representing the solution
-            at expiry.
+        fM (list):  A vector of N+1 floats, representing the option
+            price at maturity as a function of stock price.
         fmod (float):  Number to be added to the second element of the
             f(m+1) vector before using it to find fm vector.
     """

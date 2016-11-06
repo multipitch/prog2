@@ -28,24 +28,22 @@ MACHINE_EPSILON = sys.float_info.epsilon
 X_TOLERANCE = 1e-10
 R_TOLERANCE = 1e-10
   
-T = 90.0
-X = 50.0
-Smax = 100.0
-M = 16
-N = 16
-rAnnual = 0.02
-r = rAnnual * T / 365.0
-sigma = 0.3
+T = 90 / 365.0 # Option duration; T is in units of years.
+X = 50.0       # Strike price.
+Smax = 100.0   # Max stock price.
+M = 30         # Number of time increments.
+N = 30         # Number of stock price increments.
+r = 0.02       # Annualised risk-free interest rate.
+sigma = 0.3    # Volatility.
 
 
 # Run model with above parameters.
 A, fM, fmod = construct_BSM(T, X, Smax, M, N, r, sigma)
-
 F = solve_BSM(A, fM, fmod, M, N, X, MAXITS, OMEGA, MACHINE_EPSILON,
               X_TOLERANCE, R_TOLERANCE)
               
 
-# Run using scipy
+# Solve using scipy.sparse.linalg.spsolve instead of sparse_sor
 '''
 def scipy_BSM(A, fM, fmod):
     Acsr = csr_matrix(A)
@@ -67,22 +65,24 @@ F = scipy_solve(A, fM, fmod)
 # Write solutions to a file.
 write_BSM_solution(F, filename='BSM_test.out')
 
-# Create a surface plot showing option value as a function of the price
-# of the underlying stock and the number of days until expiry.
-h = float(Smax) / float(N)
-k = float(T) / float(M)
+# Create a surface plot showing option price as a function of the price
+# of the underlying stock and the number of days until maturity.
+h = Smax / float(N)
+k = T / float(M)
 Z = np.array(F)
 x = np.linspace(0, Smax, N + 1)
-y = np.linspace(0, T, M + 1)
+y = np.linspace(0, 365 * T, M + 1)
 X, Y = np.meshgrid(x, y)
 fig = plt.figure()
-ax = fig.gca(projection='3d')
-surf = ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm,
-                       linewidth=0, antialiased=False)
-xLabel = ax.set_xlabel(r'$S$')
-yLabel = ax.set_ylabel(r'$T - t$')
-zLabel = ax.set_zlabel(r'$f$')
-#plt.show()
+ax = fig.gca(projection='3d', azim=-60., elev=20.)
+ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm,
+                linewidth=0, antialiased=False)
+ax.set_xlabel(r'stock price, $S$ (\$)')
+ax.set_ylabel(r'time to maturity, $T - t$ (days)')
+ax.set_zlabel(r'option price, $f$ (\$)')
+ax.set_yticks(range(0, int(T * 365), 20))
+params = r'$r$ = ' + str(r) + r'; $\sigma$ = ' + str(sigma)
+ax.text(50, 50, 60, params)
 plt.savefig('BSM_test.pdf')
 plt.close('all')
 
