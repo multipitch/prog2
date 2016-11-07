@@ -14,11 +14,14 @@ MIS40530 Programming Assignment 2:  Linear Equations
 Constructs a BSM problem from some parameters and solves the BSM equation by calling sparseSOR.py.
 ####BSM_test.py
 Unit tests for BSM.py.
+####BSM.sh
+Executable script which constructs and solves the BSM equation by calling BSM.py and writes the result to disk.
+####nas_Sor.sh
+Executable script which reads from an input file, solves Ax = b (using sparseSOR.py) and writes to an output file.
 ####sparseSOR.py
 Solves Ax = b for sparse matrices using the Sparse-SOR algorithm. Also includes functions for I/O and matrix operations.
 ####sparseSOR_test.py
 Unit tests for sparseSOR.py.
-####nas_Sor.sh
-Executable script which reads from an input file, solves Ax = b (using sparseSOR.py) and writes to an output file.
+
 ####makefile
 Use 'make clean' to remove output files and temporary files.
