@@ -40,8 +40,8 @@ if len(sys.argv) >= 3: sigma = float(sys.argv[2])
 if len(sys.argv) >= 4: T = float(sys.argv[3])
 if len(sys.argv) >= 5: X = float(sys.argv[4])
 if len(sys.argv) >= 6: Smax = float(sys.argv[5])
-if len(sys.argv) >= 7: M = float(sys.argv[6])
-if len(sys.argv) >= 8: N = float(sys.argv[7])
+if len(sys.argv) >= 7: M = int(sys.argv[6])
+if len(sys.argv) >= 8: N = int(sys.argv[7])
 
 # Construct BSM Matrix
 A, fM, fmod = construct_BSM(T, X, Smax, M, N, r, sigma)
