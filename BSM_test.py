@@ -31,8 +31,8 @@ R_TOLERANCE = 1e-10
 T = 90 / 365.0 # Option duration; T is in units of years.
 X = 50.0       # Strike price.
 Smax = 100.0   # Max stock price.
-M = 30         # Number of time increments.
-N = 30         # Number of stock price increments.
+M = 50         # Number of time increments.
+N = 50         # Number of stock price increments.
 r = 0.02       # Annualised risk-free interest rate.
 sigma = 0.3    # Volatility.
 
@@ -75,10 +75,13 @@ y = np.linspace(0, 365 * T, M + 1)
 X, Y = np.meshgrid(x, y)
 fig = plt.figure()
 ax = fig.gca(projection='3d', azim=-60., elev=20.)
-ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm,
-                linewidth=0, antialiased=False)
+#ax.plot_surface(X, Y, np.flipud(Z), rstride=1, cstride=1, cmap=cm.coolwarm,
+#                linewidth=0, antialiased=False) # plot time to maturity
+ax.plot_surface(X, Y, np.flipud(Z), rstride=1, cstride=1, cmap=cm.coolwarm,
+                linewidth=0, antialiased=False) # plot time
 ax.set_xlabel(r'stock price, $S$ (\$)')
-ax.set_ylabel(r'time to maturity, $T - t$ (days)')
+#ax.set_ylabel(r'time to maturity, $T - t$ (days)')
+ax.set_ylabel(r'time, $T$ (days)')
 ax.set_zlabel(r'option price, $f$ (\$)')
 ax.set_yticks(range(0, int(T * 365), 20))
 params = r'$r$ = ' + str(r) + r'; $\sigma$ = ' + str(sigma)
