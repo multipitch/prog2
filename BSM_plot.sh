@@ -1,18 +1,19 @@
 #!/usr/bin/env python
 """
 This executable script solves the BSM problem, given some initial
-parameters, by calling functions in BSM.py and writes the solution to
-a file.
-
-Note that a seperate script, BSM_plot.sh does all of the above and 
-additionally creates a 3d surface plot.  It requires a number of
-additional third-party libraries to create the plot.
+parameters, by calling functions in BSM.py. It then writes the solution to
+a file and also writes a 3d surface plot of the solution to file.
 
 The script was written for Python 3.* and has been tested on 
 Python 3.5.2 and Python 2.7.12.
 
+Note that a seperate script, BSM.sh does all of the above except for
+the creation of the plot.  It doesn't require additional libraries from
+numpy, scipy and matplotlib and so exists seperately as a faster and
+more portable alternative.
+
 Authors:  Chris Kiernan, Eoin O'Driscoll, Sean Tully
-Version:  2
+Version:  1
 Date:     12th November 2016
 
 Args:
@@ -30,6 +31,15 @@ from __future__ import (absolute_import, division, print_function,
 
 import sys
 from BSM import *
+
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator, FormatStrFormatter
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.sparse.linalg import spsolve
+from scipy.sparse import csr_matrix
+
 
 # Set some operating parameters for sparse_sor
 MAXITS = 1000
@@ -73,4 +83,29 @@ F = solve_BSM(A, fM, fmod, M, N, X, MAXITS, OMEGA, MACHINE_EPSILON,
 
 # Write solutions to a file.
 write_BSM_solution(F, filename='BSM.out')
+
+
+# Create a surface plot showing option price as a function of the price
+# of the underlying stock and the number of days until maturity.
+h = Smax / float(N)
+k = T / float(M)
+Z = np.array(F)
+x = np.linspace(0, Smax, N + 1)
+y = np.linspace(0, 365 * T, M + 1)
+X, Y = np.meshgrid(x, y)
+fig = plt.figure()
+ax = fig.gca(projection='3d', azim=-60., elev=20.)
+#ax.plot_surface(X, Y, np.flipud(Z), rstride=1, cstride=1, cmap=cm.coolwarm,
+#                linewidth=0, antialiased=False) # plot time to maturity
+ax.plot_surface(X, Y, np.flipud(Z), rstride=1, cstride=1, cmap=cm.coolwarm,
+                linewidth=0, antialiased=False) # plot time
+ax.set_xlabel(r'stock price, $S$ (\$)')
+#ax.set_ylabel(r'time to maturity, $T - t$ (days)')
+ax.set_ylabel(r'time, $T$ (days)')
+ax.set_zlabel(r'option price, $f$ (\$)')
+ax.set_yticks(range(0, int(T * 365), 20))
+params = r'$r$ = ' + str(r) + r'; $\sigma$ = ' + str(sigma)
+ax.text(50, 50, 60, params)
+plt.savefig('BSM.pdf')
+plt.close('all')
 
