@@ -52,12 +52,10 @@ def sparse_sor(A, b, n, maxits, omega, machine_epsilon,
             # Check matrix diagonal values for zeros.
             for i in range(n):
                 if A[i][i] == 0:
-                    print("aaaa")
                     return None, k, 'Zero on Diagonal'
             
             # Check for strict row or column dominance.
             if not strict_dd_test(A):
-                print("bbbb")
                 return None, k, 'Not strictly row or column dominant'        
                         
             # Convert matrix to CSR format
@@ -96,10 +94,11 @@ def sparse_sor(A, b, n, maxits, omega, machine_epsilon,
                 deltax.append(x[i] - xOld[i])
             deltaxNorm = p_norm(deltax)
             
-            # Calculate 1-norm of residual.
-            Ax = Ab(A, x)
-            res = [bi - Axi for bi, Axi in zip(b, Ax)]
-            resNorm = p_norm(res)
+            # Calculate 1-norm of residual, if required.
+            if r_tolerance is not None:
+                Ax = Ab(A, x)
+                res = [bi - Axi for bi, Axi in zip(b, Ax)]
+                resNorm = p_norm(res)
 
             # Perform halting tests.
             if k > 1 and deltaxNorm > deltaxNormOld:
@@ -322,8 +321,8 @@ def Ab(A, b):
     """Multiplies an m x n matrix, A, by a vector, b, of length n.
     
     Args:
-        A (list):  An l x m matrix represented as a list of l rows, each
-            containing a list of m values as floats.
+        A (list):  An m x n matrix represented as a list of m rows, each
+            containing a list of n values as floats.
         b (list):  A vector of n floats.
             
     Returns:

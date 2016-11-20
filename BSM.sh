@@ -16,13 +16,13 @@ Version:  2
 Date:     12th November 2016
 
 Args:
-    T (float):  Total length of time.
-    X (float):  Strike price of option at time T.
-    Smax (float):   Maximum price of underlying stock.
-    M (int):    Number of price increments.
-    N (int):  Number of time increments.
-    r (float):  Risk-free interest rate.
-    sigma (float):  Volatility of stock price.
+    T (float):  Total length of time (optional).
+    X (float):  Strike price of option at time T (optional).
+    Smax (float):   Maximum price of underlying stock (optional).
+    M (int):    Number of price increments (optional).
+    N (int):  Number of time increments (optional).
+    r (float):  Risk-free interest rate (optional).
+    sigma (float):  Volatility of stock price (optional).
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)

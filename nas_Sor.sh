@@ -22,7 +22,7 @@ MAXITS = 1000
 OMEGA = 1.3
 MACHINE_EPSILON = sys.float_info.epsilon
 X_TOLERANCE = 1e-06
-R_TOLERANCE = 1e-06
+R_TOLERANCE = None
 
 # Set some default parameters.
 inputFilename = 'nas_Sor.in'
