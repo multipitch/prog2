@@ -105,7 +105,7 @@ ax.set_ylabel(r'time, $T$ (days)')
 ax.set_zlabel(r'option price, $f$ (\$)')
 ax.set_yticks(range(0, int(T * 365), 20))
 params = r'$r$ = ' + str(r) + r'; $\sigma$ = ' + str(sigma)
-ax.text(50, 50, 60, params)
+ax.text(50, 60, 60, params)
 plt.savefig('BSM.pdf')
 plt.close('all')
 
