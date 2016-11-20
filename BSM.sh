@@ -36,7 +36,7 @@ MAXITS = 1000
 OMEGA = 1.3
 MACHINE_EPSILON = sys.float_info.epsilon
 X_TOLERANCE = 1e-10
-R_TOLERANCE = 1e-10
+R_TOLERANCE = None
 
 # Set default BSM parameters  
 T = 90 / 365.0 # Option duration; T is in units of years.
